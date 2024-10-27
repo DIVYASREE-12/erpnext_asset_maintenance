@@ -122,11 +122,12 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
+#doc_events = {
+# 	"Asset Maintenance Request": {
 # 		"on_update": "method",
 # 		"on_cancel": "method",
 # 		"on_trash": "method"
+#		"on_save": "craft.send_urgent_email.send_urgent_email"
 # 	}
 # }
 
