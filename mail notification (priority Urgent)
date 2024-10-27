@@ -1,0 +1,7 @@
+if doc.priority == 'Urgent':
+    recipients = frappe.get_all('User', filters={'role_profile_name': 'manager'}, pluck='email')
+    frappe.sendmail(
+        recipients=recipients,
+        subject=f"Urgent Asset Maintenance Request {doc.name}",
+        message=f"Respected Maintenance Team Supervisor,The Asset Maintenance Request {doc.name} has been marked as urgent. Please check it.",
+    )
