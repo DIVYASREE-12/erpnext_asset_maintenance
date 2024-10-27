@@ -1,0 +1,56 @@
+frappe.ui.form.on('Asset Maintenance Request', {
+    refresh: function(frm) {
+        // Check if the user has the "Maintenance Team Supervisor" role
+        if (frappe.user_roles.includes("Maintenance Team Supervisor")) {
+            // Show the button only after the document is saved
+            if (!frm.is_new()) {
+                frm.add_custom_button(__('Create Maintenance Task'), function() {
+                    // Check if the asset field is filled
+                    if (!frm.doc.asset) {
+                        frappe.msgprint(__('Please select an Asset before creating a Task.'));
+                        return;
+                    }
+
+                    // Create a new Task in the Project module
+                    frappe.call({
+                        method: 'frappe.client.insert',
+                        args: {
+                            doc: {
+                                doctype: 'Task',
+                                subject: `Maintenance for ${frm.doc.asset_name || frm.doc.asset}`,
+                                description: frm.doc.issue_details || 'Maintenance Task created from Asset Maintenance Request',
+                                status: 'Open',  // Default Task status
+                                project: frm.doc.project,  // Optionally link to a project
+                                asset: frm.doc.asset,  // Link to the selected asset
+                                asset_maintenance_request: frm.doc.name,  // Link to the current Asset Maintenance Request
+                                priority: frm.doc.priority,  // Set the Task priority to match the Asset Maintenance Request priority
+                                expected_completion_date: frm.doc.expected_completion_date  // Set the expected completion date
+                            }
+                        },
+                        callback: function(response) {
+                            if (response && response.message) {
+                                // Display success message
+                                frappe.msgprint(__('Task {0} created successfully according to the Asset Maintenance Request.', [response.message.name]));
+                                
+                                // Change the status of the Asset Maintenance Request to 'In Progress'
+                                frm.set_value('status', 'In Progress');
+                                frm.save(); // Save the changes to update the status
+                                
+                                // Optionally, redirect to the new task
+                                frappe.set_route('Form', 'Task', response.message.name);
+                            } else {
+                                // Handle case where the response does not have a message
+                                frappe.msgprint(__('Task creation failed. Please try again.'));
+                            }
+                        },
+                        error: function(err) {
+                            // Log error response for debugging
+                            console.error(err);
+                            frappe.msgprint(__('An error occurred while creating the task. Please check the console for details.'));
+                        }
+                    });
+                });
+            }
+        }
+    }
+});
