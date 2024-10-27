@@ -1,0 +1,239 @@
+frappe.ui.form.on('Task', {
+    onload: function(frm) {
+        // Get the logged-in user's roles
+        let user_roles = frappe.user_roles;
+
+        // Check if the user has any roles
+        if (user_roles.length > 0) {
+            // Construct the message
+            let roles_message = __('Your roles: {0}', [user_roles.join(', ')]);
+            
+            // Display the message as a popup
+            frappe.msgprint({
+                title: __('User Roles'),
+                message: roles_message,
+                indicator: 'blue'
+            });
+        } else {
+            frappe.msgprint(__('You do not have any assigned roles.'));
+        }
+    },
+
+    expected_completion_date: function(frm) {
+        // Check if the logged-in user has the "Maintenance Team member" role
+        if (frappe.user_roles.includes("Maintenance Team member")) {
+            if (frm.doc.expected_completion_date && frm.doc.asset_maintenance_request) {
+                // Update completed_on field to expected_completion_date
+                frm.set_value('completed_on', frm.doc.expected_completion_date);
+                
+                // Fetch the linked Asset Maintenance Request document
+                frappe.call({
+                    method: "frappe.client.get",
+                    args: {
+                        doctype: "Asset Maintenance Request",
+                        name: frm.doc.asset_maintenance_request
+                    },
+                    callback: function(response) {
+                        if (response.message) {
+                            let amr_doc = response.message;
+                            let request_date = amr_doc.request_date;
+
+                            // Calculate resolution_time_hours if request_date is available
+                            if (request_date) {
+                                let resolution_hours = frappe.datetime.get_hour_diff(
+                                    frm.doc.expected_completion_date,
+                                    request_date
+                                );
+
+                                // Update the Asset Maintenance Request document
+                                frappe.call({
+                                    method: "frappe.client.set_value",
+                                    args: {
+                                        doctype: "Asset Maintenance Request",
+                                        name: amr_doc.name,
+                                        fieldname: {
+                                            "expected_completion_date": frm.doc.expected_completion_date,
+                                            "status": "In Review",
+                                            "resolution_time_hours": resolution_hours
+                                        }
+                                    },
+                                    callback: function(res) {
+                                        if (res.message) {
+                                            frappe.msgprint({
+                                                title: __('Success'),
+                                                message: __('Asset Maintenance Request updated successfully.'),
+                                                indicator: 'green'
+                                            });
+                                        } else {
+                                            frappe.msgprint(__('Failed to update Asset Maintenance Request.'));
+                                        }
+                                    },
+                                    error: function(err) {
+                                        frappe.msgprint(__('Error occurred while updating: ') + err.message);
+                                    }
+                                });
+                            } else {
+                                frappe.msgprint(__('Request date is not available.'));
+                            }
+                        } else {
+                            frappe.msgprint(__('Asset Maintenance Request not found.'));
+                        }
+                    },
+                    error: function(err) {
+                        frappe.msgprint(__('Error occurred while fetching Asset Maintenance Request: ') + err.message);
+                    }
+                });
+            } else {
+                frappe.msgprint(__('Please set an Expected Completion Date and link an Asset Maintenance Request.'));
+            }
+        } else {
+            // This message will now not show when trying to update the date, but you can enable it if necessary.
+            // frappe.msgprint(__('You do not have the "Maintenance Team Member" role to perform this action.'));
+        }
+    },
+
+    completed_on: function(frm) {
+        // Check if the logged-in user has the "Maintenance Team member" role
+        if (frappe.user_roles.includes("Maintenance Team member")) {
+            if (frm.doc.completed_on) {
+                // Update expected_completion_date to completed_on
+                frm.set_value('expected_completion_date', frm.doc.completed_on);
+
+                // Now perform the same update on the linked Asset Maintenance Request
+                if (frm.doc.asset_maintenance_request) {
+                    frappe.call({
+                        method: "frappe.client.get",
+                        args: {
+                            doctype: "Asset Maintenance Request",
+                            name: frm.doc.asset_maintenance_request
+                        },
+                        callback: function(response) {
+                            if (response.message) {
+                                let amr_doc = response.message;
+                                let request_date = amr_doc.request_date;
+
+                                // Calculate resolution_time_hours if request_date is available
+                                if (request_date) {
+                                    let resolution_hours = frappe.datetime.get_hour_diff(
+                                        frm.doc.expected_completion_date,
+                                        request_date
+                                    );
+
+                                    // Update the Asset Maintenance Request document
+                                    frappe.call({
+                                        method: "frappe.client.set_value",
+                                        args: {
+                                            doctype: "Asset Maintenance Request",
+                                            name: amr_doc.name,
+                                            fieldname: {
+                                                "expected_completion_date": frm.doc.expected_completion_date,
+                                                "status": "In Review",
+                                                "resolution_time_hours": resolution_hours
+                                            }
+                                        },
+                                        callback: function(res) {
+                                            if (res.message) {
+                                                frappe.msgprint({
+                                                    title: __('Success'),
+                                                    message: __('Asset Maintenance Request updated successfully.'),
+                                                    indicator: 'green'
+                                                });
+                                            } else {
+                                                frappe.msgprint(__('Failed to update Asset Maintenance Request.'));
+                                            }
+                                        },
+                                        error: function(err) {
+                                            frappe.msgprint(__('Error occurred while updating: ') + err.message);
+                                        }
+                                    });
+                                } else {
+                                    frappe.msgprint(__('Request date is not available.'));
+                                }
+                            } else {
+                                frappe.msgprint(__('Asset Maintenance Request not found.'));
+                            }
+                        },
+                        error: function(err) {
+                            frappe.msgprint(__('Error occurred while fetching Asset Maintenance Request: ') + err.message);
+                        }
+                    });
+                } else {
+                    frappe.msgprint(__('Please link an Asset Maintenance Request.'));
+                }
+            }
+        }
+    },
+
+    status: function(frm) {
+        // Check if the user has the "Maintenance Team member" role and status is set
+        if (frappe.user_roles.includes("Maintenance Team member") && frm.doc.status) {
+            // Check if completed_on field is filled
+            if (frm.doc.completed_on) {
+                // Set expected_completion_date to completed_on
+                frm.set_value('expected_completion_date', frm.doc.completed_on);
+
+                // Now perform the same update on the linked Asset Maintenance Request
+                if (frm.doc.asset_maintenance_request) {
+                    frappe.call({
+                        method: "frappe.client.get",
+                        args: {
+                            doctype: "Asset Maintenance Request",
+                            name: frm.doc.asset_maintenance_request
+                        },
+                        callback: function(response) {
+                            if (response.message) {
+                                let amr_doc = response.message;
+                                let request_date = amr_doc.request_date;
+
+                                // Calculate resolution_time_hours if request_date is available
+                                if (request_date) {
+                                    let resolution_hours = frappe.datetime.get_hour_diff(
+                                        frm.doc.expected_completion_date,
+                                        request_date
+                                    );
+
+                                    // Update the Asset Maintenance Request document
+                                    frappe.call({
+                                        method: "frappe.client.set_value",
+                                        args: {
+                                            doctype: "Asset Maintenance Request",
+                                            name: amr_doc.name,
+                                            fieldname: {
+                                                "expected_completion_date": frm.doc.expected_completion_date,
+                                                "status": "In Review",
+                                                "resolution_time_hours": resolution_hours
+                                            }
+                                        },
+                                        callback: function(res) {
+                                            if (res.message) {
+                                                frappe.msgprint({
+                                                    title: __('Success'),
+                                                    message: __('Asset Maintenance Request updated successfully.'),
+                                                    indicator: 'green'
+                                                });
+                                            } else {
+                                                frappe.msgprint(__('Failed to update Asset Maintenance Request.'));
+                                            }
+                                        },
+                                        error: function(err) {
+                                            frappe.msgprint(__('Error occurred while updating: ') + err.message);
+                                        }
+                                    });
+                                } else {
+                                    frappe.msgprint(__('Request date is not available.'));
+                                }
+                            } else {
+                                frappe.msgprint(__('Asset Maintenance Request not found.'));
+                            }
+                        },
+                        error: function(err) {
+                            frappe.msgprint(__('Error occurred while fetching Asset Maintenance Request: ') + err.message);
+                        }
+                    });
+                } else {
+                    frappe.msgprint(__('Please link an Asset Maintenance Request.'));
+                }
+            }
+        }
+    }
+});
